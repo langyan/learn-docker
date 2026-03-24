@@ -1,0 +1,53 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+
+  # ─── InfluxDB 3 Core ──────────────────────────────────────────
+  influxdb3:
+    image: influxdb:3-core
+    container_name: influxdb3-core
+    restart: unless-stopped
+    ports:
+      - "8181:8181"
+    command:
+      - influxdb3
+      - serve
+      - --node-id=node0
+      - --object-store=file
+      - --data-dir=/var/lib/influxdb3/data
+    volumes:
+      - influxdb3-data:/var/lib/influxdb3/data
+    networks:
+      - influx-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── InfluxDB 3 Explorer ──────────────────────────────────────
+  explorer:
+    image: influxdata/influxdb3-ui:1.6.2
+    container_name: influxdb3-explorer
+    restart: unless-stopped
+    command: ["--mode=admin"]
+    ports:
+      - "8888:80"
+    volumes:
+      - ./db:/db:rw                        # SQLite 持久化（必须）
+      - ./config:/app-root/config:ro       # 预配置连接（可选）
+    environment:
+      SESSION_SECRET_KEY: ${SESSION_SECRET_KEY}
+    depends_on:
+      influxdb3:
+        condition: service_healthy
+    networks:
+      - influx-net
+
+volumes:
+  influxdb3-data:
+
+networks:
+  influx-net:
+    driver: bridge
